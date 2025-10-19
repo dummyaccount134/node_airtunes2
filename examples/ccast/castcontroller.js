@@ -21,12 +21,23 @@ CiderCastController.prototype.sendIp = function (ip) {
   this.request(data);
 };
 
+CiderCastController.prototype.sendChunkedMp3Audio = function (base64AudioChunk) {
+  // TODO: Implement Callback
+  let data = {
+    action: "sendChunkedMp3Audio",
+    audio: base64AudioChunk,
+  };
+  this.request(data);
+};
+
 CiderCastController.prototype.kill = function () {
   // TODO: Implement Callback
   let data = {
     action: "stop",
   };
-  this.request(data);
+  try {
+    this.request(data);
+  } catch (e) {}
 };
 
 CiderCastController.prototype.setMetadata = function (song, artist, album, albumart) {

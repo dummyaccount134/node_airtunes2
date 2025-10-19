@@ -72,6 +72,10 @@ CiderReceiver.prototype.sendIp = function (opts) {
   this.mediaReceiver.sendIp.apply(this.mediaReceiver, arguments);
 };
 
+CiderReceiver.prototype.sendChunkedMp3Audio = function (opts) {
+  this.mediaReceiver.sendChunkedMp3Audio.apply(this.mediaReceiver, arguments);
+};
+
 CiderReceiver.prototype.kill = function (opts) {
   this.mediaReceiver.kill.apply(this.mediaReceiver, arguments);
 };

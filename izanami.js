@@ -9,6 +9,7 @@ const { Stream } = require("stream");
 var audioStream = new Stream.PassThrough();
 const getPort = require("get-port-cjs");
 const Chromecast = require("./examples/ccast/lib.js");
+const ip = require("ip");
 
 async function main() {
   // console.log(await getPort());
@@ -43,9 +44,31 @@ async function main() {
   //   // }
   // });
 
+
   var HttpAudioPort = await getPort();
   console.log("HttpAudioPort", HttpAudioPort);
   chromecast.setAudioPort(HttpAudioPort);
+
+  // create express server to serve audio to Chromecast devices
+  const express = require("express");
+  const app = express();
+  app.set('port', HttpAudioPort);
+  app.get("/listen.mp3", (req, res) => {
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+    });
+    audioStream.on("data", (data) => {
+          try {
+            console.log("sending audio data chunk to Chromecast, size=", data.length);
+            res.write(data);
+          } catch (ex) {
+            console.log(ex);
+          }
+    });
+  });
+  app.listen(HttpAudioPort);
 
   // monitor buffer events
   airtunes.on("buffer", function (status) {
@@ -231,7 +254,9 @@ async function main() {
       // {"type":"stop",
       //  "devicekey": "192.168.3.4:7000"}
       airtunes.stop(parsed_data.devicekey);
+      try {
       chromecast.stop(parsed_data.devicekey);
+      } catch (e) {}
     } else if (parsed_data.type == "stopAll") {
       // Sample data for stopping all:
       // {"type":"stopAll"}
@@ -242,7 +267,14 @@ async function main() {
       // {"type":"sendAudio",
       //  "data": "hex data"}
       airtunes.write(Buffer.from(parsed_data.data, "base64"));
+    } else if (parsed_data.type == "sendAudioCC") {
+      // Sample data for playing:
+      // {"type":"sendAudioCC",
+      //  "data": "hex data"}
       audioStream.write(Buffer.from(parsed_data.data, "base64"));
+      try {
+        chromecast.sendChunkedMp3Audio(parsed_data.data, "base64");
+      } catch (e) {}
     } else if (parsed_data.type == "httpAudioIP") {
       let status_json = {
         type: "httpAudioIP",
