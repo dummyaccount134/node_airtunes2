@@ -38,7 +38,7 @@ Chromecast.prototype.loadMedia = function (
     }
     let media = {
       // Here you can plug an URL to any mp4, webm, mp3 or jpg file with the proper contentType.
-      contentId: "https://github.com/anars/blank-audio/raw/refs/heads/master/1-hour-and-20-minutes-of-silence.mp3",
+      contentId: "https://github.com/vapormusic/cast.cider.sh/raw/998196200191e79851cbf326c496184e44bb2a6c/silence_24h_smallest.ogg",
       contentType: "audio/mp3",
       streamType: "LIVE", // or LIVE
 
