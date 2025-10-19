@@ -38,8 +38,8 @@ Chromecast.prototype.loadMedia = function (
     }
     let media = {
       // Here you can plug an URL to any mp4, webm, mp3 or jpg file with the proper contentType.
-      contentId: "http://" + this.getIp() + ":" + this.ciderPort + "/listen",
-      contentType: "audio/mpeg",
+      contentId: "https://github.com/anars/blank-audio/raw/refs/heads/master/1-hour-and-20-minutes-of-silence.mp3",
+      contentType: "audio/mp3",
       streamType: "LIVE", // or LIVE
 
       // Title and cover displayed while buffering
@@ -329,6 +329,15 @@ Chromecast.prototype.stopAll = function () {
 
   this.activeConnections = {};
   this.connectedHosts = {};
+};
+
+
+Chromecast.prototype.sendChunkedMp3Audio = function (base64AudioChunk) {
+  for (const [key, value] of Object.entries(this.activeConnections)) {
+    try {
+      value.session.sendChunkedMp3Audio(base64AudioChunk);
+    } catch (e) {}
+  }
 };
 
 module.exports = Chromecast;
