@@ -10,6 +10,8 @@ var audioStream = new Stream.PassThrough();
 const getPort = require("get-port-cjs");
 const Chromecast = require("./examples/ccast/lib.js");
 const ip = require("ip");
+const Client = require("node-ssdp").Client;
+const parseString = require("xml2js").parseString;
 
 async function main() {
   // console.log(await getPort());
@@ -61,7 +63,6 @@ async function main() {
     });
     audioStream.on("data", (data) => {
           try {
-            console.log("sending audio data chunk to Chromecast, size=", data.length);
             res.write(data);
           } catch (ex) {
             console.log(ex);
@@ -145,6 +146,15 @@ async function main() {
       if ((parsed_data.devicetype ?? "") == "googlecast") {
         chromecast.stream(
           { type: "googlecast", host: parsed_data.host },
+          "Cider 2",
+          "Streaming...",
+          "",
+          ""
+        );
+      } 
+      else if ((parsed_data.devicetype ?? "") == "upnp") {
+        chromecast.stream(
+          { type: "upnp", host: parsed_data.host, location: parsed_data.args.txt },
           "Cider 2",
           "Streaming...",
           "",
@@ -370,6 +380,53 @@ async function main() {
         );
       }
     });
+
+    let ssdpBrowser2 = new Client();
+    ssdpBrowser2.on("response", (headers, statusCode, rinfo) => {
+        var location = getLocation(headers);
+        if (location != null) {
+          getServiceDescription(location, rinfo.address);
+        }
+    });
+    ssdpBrowser2.search("urn:schemas-upnp-org:device:MediaRenderer:1");
+  }
+
+  function getLocation(headers) {
+        let location = null;
+        if (headers["LOCATION"] != null) {
+          location = headers["LOCATION"];
+        } else if (headers["Location"] != null) {
+          location = headers["Location"];
+        }
+        return location;
+  }
+
+  function getServiceDescription(url, address) {
+    const request = require("request");
+    request.get(url, (error, response , body ) => {
+      if (!error && response.statusCode === 200) {
+        parseServiceDescription(body, address, url);
+      }
+    });
+  }
+
+  function parseServiceDescription(body, address, url) {
+    parseString(body, (err, result) => {
+      if (!err && result && result.root && result.root.device) {
+        const device2 = result.root.device[0];
+        console.log("device", device2);
+        let devicetype = "googlecast";
+        if (device2.deviceType && (device2.deviceType.toString() === "urn:schemas-upnp-org:device:MediaRenderer:1" || device2.deviceType.toString() == "urn:schemas-upnp-org:device:ZonePlayer:1")) {
+          devicetype = "upnp";
+        }
+        if ((device2.deviceType.toString().startsWith("urn:schemas-upnp-org") && devicetype != "googlecast") || devicetype == "upnp") {
+          ondeviceup(device2.friendlyName.toString() ?? "(" + devicetype + ")", 
+                     address, 
+                     "-1",
+                     [address], url, null, "upnp");
+        }
+      }
+    });
   }
 
   function ondeviceup(
@@ -491,7 +548,7 @@ async function main() {
           console.log("deviceFound (added)", host_name, shown_name);
         }
       }
-    } else if (devicetype == "googlecast") {
+    } else if (devicetype == "googlecast" || devicetype == "upnp") {
       if (
         castDevices.findIndex((item) => {
           return (

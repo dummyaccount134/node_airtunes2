@@ -4,6 +4,7 @@ const util = require("util");
 const { resolve } = require("path");
 const CiderReceiver = require("./castreceiver");
 const DefaultMediaReceiver = require("castv2-client").DefaultMediaReceiver;
+const MediaRendererClient = require("upnp-mediarenderer-client");
 
 function Chromecast() {
   this.castDevices = [];
@@ -192,29 +193,43 @@ Chromecast.prototype.stream = function (device, song, artist, album, albumart) {
     });
   } else {
     // upnp devices
-    //   try {
-    //     let client = new MediaRendererClient(UPNPDesc);
-    //     const options = {
-    //       autoplay: true,
-    //       contentType: "audio/x-wav",
-    //       dlnaFeatures: "DLNA.ORG_PN=-;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000",
-    //       metadata: {
-    //         title: "Cider",
-    //         creator: "Streaming ...",
-    //         type: "audio", // can be 'video', 'audio' or 'image'
-    //         //  url: 'http://' + getIp() + ':' + server.address().port + '/',
-    //         //  protocolInfo: 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000;
-    //       },
-    //     };
-    //     client.load("http://" + this.getIp() + ":" + this.ciderPort + "/audio.wav", options, function (err, _result) {
-    //       if (err) throw err;
-    //       console.log("playing ...");
-    //     });
-    //     if (!this.connectedHosts[device.host]) {
-    //       this.connectedHosts[device.host] = client;
-    //       this.activeConnections.push(client);
-    //     }
-    //   } catch (e) {}
+      try {
+        let client = new MediaRendererClient(UPNPDesc);
+        const options = {
+          autoplay: true,
+          contentType: "audio/mpeg",
+          dlnaFeatures: "DLNA.ORG_PN=-;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000",
+          metadata: {
+            title: "Cider",
+            creator: "Streaming ...",
+            type: "audio", // can be 'video', 'audio' or 'image'
+            artworkURI: "https://cider.sh/logo.png", 
+            //  url: 'http://' + getIp() + ':' + server.address().port + '/',
+            //  protocolInfo: 'DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000;
+          },
+        };
+        console.log("Connecting to UPNP device at " + device.host, device.location,
+          "http://" + this.getIp() + ":" + this.ciderPort + "/listen.mp3"
+        );
+        let host = device.host  + ":-1ap";
+        client.load("http://" + this.getIp() + ":" + this.ciderPort + "/listen.mp3", options, (err, _result)  => {
+          if (err) throw err;
+          console.log("playing ...");          
+          this.emit("device", host, "pair_success", "loading");
+          this.emit("device", host, "ready", "loading");
+        });
+        client.on("loading",() => {
+          this.emit("device", host, "pair_success", "loading");
+          this.emit("device", host, "ready", "loading");
+        });
+        client.on("stopped",() => {
+          this.emit("device", host, "stopped",  "");
+        });
+        if (!this.connectedHosts[host]) {
+          this.connectedHosts[host] = client;
+          this.activeConnections[host] = client;
+        }
+      } catch (e) {}
   }
 };
 
@@ -225,7 +240,12 @@ Chromecast.prototype.setAudioPort = function (port) {
 Chromecast.prototype.stop = function (host) {
   if (this.activeConnections[host]) {
     console.log(this.activeConnections[host].session);
-    this.activeConnections[host].session.kill();
+    try {
+      this.activeConnections[host].session.kill();
+    } catch (e) {}
+    try {
+      this.activeConnections[host].stop();
+    } catch (e) {}
     delete this.activeConnections[host];
   }
   if (this.connectedHosts[host]) {
@@ -235,7 +255,12 @@ Chromecast.prototype.stop = function (host) {
 
 Chromecast.prototype.setVolume = function (host, volume) {
   if (this.activeConnections[host]) {
-    this.activeConnections[host].session.setVolume(volume);
+    try {
+      this.activeConnections[host].session.setVolume(volume);
+    } catch (e) {}
+    try {
+      this.activeConnections[host].setVolume(volume);
+    } catch (e) {}
   }
   // if (this.connectedHosts[host]) {
   //   this.connectedHosts[host].volume = volume;
@@ -324,7 +349,12 @@ Chromecast.prototype.setArtwork = function (host, artworkURL) {
 
 Chromecast.prototype.stopAll = function () {
   for (const [key, value] of Object.entries(this.activeConnections)) {
-    value.session.kill();
+    try {
+      value.session.kill();
+    } catch (e) {}
+    try {
+      value.stop();
+    } catch (e) {}
   }
 
   this.activeConnections = {};
